@@ -53,30 +53,13 @@ async function loadRates() {
         const eur = currencyData.Valute.EUR.Value.toFixed(2);
         const cny = currencyData.Valute.CNY.Value.toFixed(2);
 
-        // ===== МЕТАЛЛЫ (официальный XML ЦБ) =====
-        const metalResponse = await fetch(
-            "https://api.allorigins.win/raw?url=https://www.cbr.ru/scripts/xml_metall.asp"
-        );
-        const metalText = await metalResponse.text();
-        const metalXML = new DOMParser().parseFromString(metalText, "text/xml");
+        // ===== МЕТАЛЛЫ =====
+        const metalsResponse = await fetch("https://www.cbr-xml-daily.ru/daily_json.js");
+        const metalsData = await metalsResponse.json();
 
-        function getMetal(code) {
-            const records = metalXML.getElementsByTagName("Record");
-            for (let record of records) {
-                if (record.getAttribute("Code") === code) {
-                    const buyNode = record.getElementsByTagName("Buy")[0];
-                    if (buyNode) {
-                        return parseFloat(
-                            buyNode.textContent.replace(",", ".")
-                        ).toFixed(2);
-                    }
-                }
-            }
-            return "нет данных";
-        }
-
-        const gold = getMetal("1");   // золото
-        const silver = getMetal("2"); // серебро
+        // В этом API металлы идут внутри Valute
+        const gold = metalsData.Valute.XAU ? metalsData.Valute.XAU.Value.toFixed(2) : "нет данных";
+        const silver = metalsData.Valute.XAG ? metalsData.Valute.XAG.Value.toFixed(2) : "нет данных";
 
         document.getElementById("rates").innerHTML = `
             <div class="card">
@@ -95,12 +78,12 @@ async function loadRates() {
             </div>
 
             <div class="card">
-                <div class="title">Золото (1 г)</div>
+                <div class="title">Золото (XAU)</div>
                 <div class="value">${gold} ₽</div>
             </div>
 
             <div class="card">
-                <div class="title">Серебро (1 г)</div>
+                <div class="title">Серебро (XAG)</div>
                 <div class="value">${silver} ₽</div>
             </div>
         `;
@@ -113,5 +96,6 @@ async function loadRates() {
 
 loadRates();
 </script>
+
 </body>
 </html>
