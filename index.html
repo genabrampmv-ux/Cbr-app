@@ -1,52 +1,66 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>Курсы ЦБ</title>
-</head>
-<body>
-    <h2>Курсы валют ЦБ РФ</h2>
-    <div id="rates">Загрузка...</div>
+<script>
+async function loadRates() {
+    try {
+        // Валюты
+        const currencyResponse = await fetch(
+            "https://api.allorigins.win/raw?url=https://www.cbr.ru/scripts/XML_daily.asp"
+        );
+        const currencyText = await currencyResponse.text();
+        const currencyXML = new DOMParser().parseFromString(currencyText, "text/xml");
 
-    <script>
-        async function loadRates() {
-            try {
-                const response = await fetch(
-                    "https://api.allorigins.win/raw?url=https://www.cbr.ru/scripts/XML_daily.asp"
-                );
-                const text = await response.text();
-
-                const parser = new DOMParser();
-                const xml = parser.parseFromString(text, "text/xml");
-
-                function getRate(code) {
-                    const valutes = xml.getElementsByTagName("Valute");
-                    for (let valute of valutes) {
-                        if (valute.getElementsByTagName("CharCode")[0].textContent === code) {
-                            let value = valute.getElementsByTagName("Value")[0].textContent;
-                            let nominal = valute.getElementsByTagName("Nominal")[0].textContent;
-                            return (parseFloat(value.replace(",", ".")) / parseFloat(nominal)).toFixed(2);
-                        }
-                    }
-                    return "не найдено";
+        function getCurrency(code) {
+            const valutes = currencyXML.getElementsByTagName("Valute");
+            for (let valute of valutes) {
+                if (valute.getElementsByTagName("CharCode")[0].textContent === code) {
+                    let value = valute.getElementsByTagName("Value")[0].textContent;
+                    let nominal = valute.getElementsByTagName("Nominal")[0].textContent;
+                    return (parseFloat(value.replace(",", ".")) / parseFloat(nominal)).toFixed(2);
                 }
-
-                const usd = getRate("USD");
-                const eur = getRate("EUR");
-                const cny = getRate("CNY");
-
-                document.getElementById("rates").innerHTML = `
-                    1 USD = ${usd} ₽ <br>
-                    1 EUR = ${eur} ₽ <br>
-                    1 CNY = ${cny} ₽
-                `;
-
-            } catch (error) {
-                document.getElementById("rates").innerText = "Ошибка загрузки";
             }
+            return "не найдено";
         }
 
-        loadRates();
-    </script>
-</body>
-</html>
+        const usd = getCurrency("USD");
+        const eur = getCurrency("EUR");
+        const cny = getCurrency("CNY");
+
+        // Металлы
+        const metalResponse = await fetch(
+            "https://api.allorigins.win/raw?url=https://www.cbr.ru/scripts/xml_metall.asp"
+        );
+        const metalText = await metalResponse.text();
+        const metalXML = new DOMParser().parseFromString(metalText, "text/xml");
+
+        function getMetal(code) {
+            const metals = metalXML.getElementsByTagName("Record");
+            for (let metal of metals) {
+                if (metal.getAttribute("Code") === code) {
+                    return parseFloat(
+                        metal.getElementsByTagName("Buy")[0].textContent.replace(",", ".")
+                    ).toFixed(2);
+                }
+            }
+            return "не найдено";
+        }
+
+        const gold = getMetal("1");   // золото
+        const silver = getMetal("2"); // серебро
+
+        document.getElementById("rates").innerHTML = `
+            <b>Валюты:</b><br>
+            1 USD = ${usd} ₽ <br>
+            1 EUR = ${eur} ₽ <br>
+            1 CNY = ${cny} ₽ <br><br>
+
+            <b>Драгоценные металлы (за 1 грамм):</b><br>
+            Золото = ${gold} ₽ <br>
+            Серебро = ${silver} ₽
+        `;
+
+    } catch (error) {
+        document.getElementById("rates").innerText = "Ошибка загрузки";
+    }
+}
+
+loadRates();
+</script>
