@@ -1,7 +1,53 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Курсы ЦБ РФ</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #111;
+            color: white;
+            text-align: center;
+            padding: 30px;
+        }
+
+        h2 {
+            margin-bottom: 20px;
+        }
+
+        .card {
+            background: #1e1e1e;
+            padding: 20px;
+            border-radius: 12px;
+            margin: 15px auto;
+            max-width: 320px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.4);
+        }
+
+        .title {
+            font-size: 14px;
+            opacity: 0.7;
+        }
+
+        .value {
+            font-size: 22px;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+
+<h2>Курсы ЦБ РФ</h2>
+
+<div id="rates">Загрузка...</div>
+
 <script>
 async function loadRates() {
     try {
-        // Валюты
+        // ===== ВАЛЮТЫ =====
         const currencyResponse = await fetch(
             "https://api.allorigins.win/raw?url=https://www.cbr.ru/scripts/XML_daily.asp"
         );
@@ -11,20 +57,26 @@ async function loadRates() {
         function getCurrency(code) {
             const valutes = currencyXML.getElementsByTagName("Valute");
             for (let valute of valutes) {
-                if (valute.getElementsByTagName("CharCode")[0].textContent === code) {
-                    let value = valute.getElementsByTagName("Value")[0].textContent;
-                    let nominal = valute.getElementsByTagName("Nominal")[0].textContent;
-                    return (parseFloat(value.replace(",", ".")) / parseFloat(nominal)).toFixed(2);
+                const charCode = valute.getElementsByTagName("CharCode")[0];
+                if (charCode && charCode.textContent === code) {
+                    const value = valute.getElementsByTagName("Value")[0];
+                    const nominal = valute.getElementsByTagName("Nominal")[0];
+                    if (value && nominal) {
+                        return (
+                            parseFloat(value.textContent.replace(",", ".")) /
+                            parseFloat(nominal.textContent)
+                        ).toFixed(2);
+                    }
                 }
             }
-            return "не найдено";
+            return "нет данных";
         }
 
         const usd = getCurrency("USD");
         const eur = getCurrency("EUR");
         const cny = getCurrency("CNY");
 
-        // Металлы
+        // ===== МЕТАЛЛЫ =====
         const metalResponse = await fetch(
             "https://api.allorigins.win/raw?url=https://www.cbr.ru/scripts/xml_metall.asp"
         );
@@ -32,35 +84,56 @@ async function loadRates() {
         const metalXML = new DOMParser().parseFromString(metalText, "text/xml");
 
         function getMetal(code) {
-            const metals = metalXML.getElementsByTagName("Record");
-            for (let metal of metals) {
-                if (metal.getAttribute("Code") === code) {
-                    return parseFloat(
-                        metal.getElementsByTagName("Buy")[0].textContent.replace(",", ".")
-                    ).toFixed(2);
+            const records = metalXML.getElementsByTagName("Record");
+            for (let record of records) {
+                if (record.getAttribute("Code") === code) {
+                    const buy = record.getElementsByTagName("Buy")[0];
+                    if (buy) {
+                        return parseFloat(buy.textContent.replace(",", ".")).toFixed(2);
+                    }
                 }
             }
-            return "не найдено";
+            return "нет данных";
         }
 
         const gold = getMetal("1");   // золото
         const silver = getMetal("2"); // серебро
 
         document.getElementById("rates").innerHTML = `
-            <b>Валюты:</b><br>
-            1 USD = ${usd} ₽ <br>
-            1 EUR = ${eur} ₽ <br>
-            1 CNY = ${cny} ₽ <br><br>
+            <div class="card">
+                <div class="title">USD</div>
+                <div class="value">1 USD = ${usd} ₽</div>
+            </div>
 
-            <b>Драгоценные металлы (за 1 грамм):</b><br>
-            Золото = ${gold} ₽ <br>
-            Серебро = ${silver} ₽
+            <div class="card">
+                <div class="title">EUR</div>
+                <div class="value">1 EUR = ${eur} ₽</div>
+            </div>
+
+            <div class="card">
+                <div class="title">CNY</div>
+                <div class="value">1 CNY = ${cny} ₽</div>
+            </div>
+
+            <div class="card">
+                <div class="title">Золото (1 г)</div>
+                <div class="value">${gold} ₽</div>
+            </div>
+
+            <div class="card">
+                <div class="title">Серебро (1 г)</div>
+                <div class="value">${silver} ₽</div>
+            </div>
         `;
 
     } catch (error) {
-        document.getElementById("rates").innerText = "Ошибка загрузки";
+        document.getElementById("rates").innerText = "Ошибка загрузки данных";
+        console.error(error);
     }
 }
 
 loadRates();
 </script>
+
+</body>
+</html>
