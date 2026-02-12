@@ -45,7 +45,7 @@
 <script>
 async function loadRates() {
     try {
-        // Валюты (JSON API)
+        // ===== ВАЛЮТЫ =====
         const currencyResponse = await fetch("https://www.cbr-xml-daily.ru/daily_json.js");
         const currencyData = await currencyResponse.json();
 
@@ -53,12 +53,30 @@ async function loadRates() {
         const eur = currencyData.Valute.EUR.Value.toFixed(2);
         const cny = currencyData.Valute.CNY.Value.toFixed(2);
 
-        // Металлы (через тот же API)
-        const metalResponse = await fetch("https://www.cbr-xml-daily.ru/metals_json.js");
-        const metalData = await metalResponse.json();
+        // ===== МЕТАЛЛЫ (официальный XML ЦБ) =====
+        const metalResponse = await fetch(
+            "https://api.allorigins.win/raw?url=https://www.cbr.ru/scripts/xml_metall.asp"
+        );
+        const metalText = await metalResponse.text();
+        const metalXML = new DOMParser().parseFromString(metalText, "text/xml");
 
-        const gold = metalData[0].Value.toFixed(2);   // золото
-        const silver = metalData[1].Value.toFixed(2); // серебро
+        function getMetal(code) {
+            const records = metalXML.getElementsByTagName("Record");
+            for (let record of records) {
+                if (record.getAttribute("Code") === code) {
+                    const buyNode = record.getElementsByTagName("Buy")[0];
+                    if (buyNode) {
+                        return parseFloat(
+                            buyNode.textContent.replace(",", ".")
+                        ).toFixed(2);
+                    }
+                }
+            }
+            return "нет данных";
+        }
+
+        const gold = getMetal("1");   // золото
+        const silver = getMetal("2"); // серебро
 
         document.getElementById("rates").innerHTML = `
             <div class="card">
@@ -95,6 +113,5 @@ async function loadRates() {
 
 loadRates();
 </script>
-
 </body>
 </html>
