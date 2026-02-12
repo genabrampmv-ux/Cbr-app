@@ -61,43 +61,45 @@
     </div>
 
     <script>
-        // Инициализация Telegram Web App
-        const tg = window.Telegram.WebApp;
-        tg.ready();
-        tg.expand();
+    const tg = window.Telegram.WebApp;
+    tg.ready();
+    tg.expand();
 
-        async function getRates() {
-            const resultDiv = document.getElementById('result');
-            const btn = document.getElementById('btn');
+    async function getRates() {
+        const resultDiv = document.getElementById('result');
+        const btn = document.getElementById('btn');
+        
+        resultDiv.innerText = '⏳...';
+        btn.disabled = true;
+        
+        try {
+            // Используем прокси-сервер AllOrigins, чтобы обойти блокировку CORS
+            const targetUrl = 'https://www.cbr-xml-daily.ru';
+            const proxyUrl = `https://api.allorigins.win{encodeURIComponent(targetUrl)}`;
             
-            resultDiv.innerText = '⏳...';
-            btn.disabled = true; // Отключаем кнопку на время запроса
+            const response = await fetch(proxyUrl);
+            if (!response.ok) throw new Error('Ошибка сети');
             
-            try {
-                // Запрашиваем данные у проверенного API (зеркало ЦБ)
-                const response = await fetch('https://www.cbr-xml-daily.ru');
-                if (!response.ok) throw new Error('Ошибка сети');
-                
-                const data = await response.json();
-                
-                // Берем курс доллара
-                const usdRate = data.Valute.USD.Value.toFixed(2);
-                resultDiv.innerText = usdRate + ' ₽';
-                
-                // Вибрация при успехе
-                if (tg.HapticFeedback) {
-                    tg.HapticFeedback.notificationOccurred('success');
-                }
-            } catch (error) {
-                resultDiv.innerText = 'Ошибка ❌';
-                console.error('Ошибка:', error);
-            } finally {
-                btn.disabled = false;
+            const json = await response.json();
+            // AllOrigins упаковывает ответ в поле contents, его надо распарсить
+            const data = JSON.parse(json.contents);
+            
+            const usdRate = data.Valute.USD.Value.toFixed(2);
+            resultDiv.innerText = usdRate + ' ₽';
+            
+            if (tg.HapticFeedback) {
+                tg.HapticFeedback.notificationOccurred('success');
             }
+        } catch (error) {
+            resultDiv.innerText = 'Ошибка ❌';
+            console.error('Подробности ошибки:', error);
+        } finally {
+            btn.disabled = false;
         }
+    }
 
-        // Вызываем сразу при открытии
-        getRates();
-    </script>
+    // Запускаем при старте
+    getRates();
+</script>
 </body>
 </html>
