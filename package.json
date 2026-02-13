@@ -1,1 +1,8 @@
-
+{
+  &quot;name&quot;: &quot;cbr-tg-bot&quot;,
+  &quot;version&quot;: &quot;1.0.0&quot;,
+  &quot;dependencies&quot;: {
+    &quot;telegraf&quot;: &quot;^4.16.3&quot;,
+    &quot;node-fetch&quot;: &quot;^2.7.0&quot;
+  }
+}
