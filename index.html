@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Курсы ЦБ РФ для prem_team</title>
+<title>Курсы ЦБ РФ</title>
 
 <style>
 body {
@@ -13,7 +13,6 @@ body {
     text-align: center;
     padding: 30px;
 }
-
 .card {
     background: #1e1e1e;
     padding: 20px;
@@ -42,7 +41,7 @@ async function loadRates() {
         const eur = currencyData.Valute.EUR.Value.toFixed(2);
         const cny = currencyData.Valute.CNY.Value.toFixed(2);
 
-        // ===== МЕТАЛЛЫ =====
+        // ===== МЕТАЛЛЫ (официальный XML ЦБ) =====
         const metalResponse = await fetch(
             "https://api.allorigins.win/raw?url=https://www.cbr.ru/scripts/xml_metall.asp"
         );
@@ -57,10 +56,12 @@ async function loadRates() {
 
         for (let record of records) {
             const code = record.getAttribute("Code");
-            const buy = record.getElementsByTagName("Buy")[0];
+            const valueNode = record.getElementsByTagName("Value")[0];
 
-            if (buy) {
-                const price = parseFloat(buy.textContent.replace(",", ".")).toFixed(2);
+            if (valueNode) {
+                const price = parseFloat(
+                    valueNode.textContent.replace(",", ".")
+                ).toFixed(2);
 
                 if (code === "1") gold = price;      // золото
                 if (code === "2") silver = price;    // серебро
