@@ -31,6 +31,13 @@ body {
 <div id="rates">Загрузка...</div>
 
 <script>
+function formatDate(date) {
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+}
+
 async function loadRates() {
     try {
         // ===== ВАЛЮТЫ =====
@@ -41,11 +48,14 @@ async function loadRates() {
         const eur = currencyData.Valute.EUR.Value.toFixed(2);
         const cny = currencyData.Valute.CNY.Value.toFixed(2);
 
-        // ===== МЕТАЛЛЫ (официальный XML ЦБ) =====
-        const metalResponse = await fetch(
-            "https://api.allorigins.win/raw?url=https://www.cbr.ru/scripts/xml_metall.asp"
-        );
+        // ===== МЕТАЛЛЫ =====
+        const today = formatDate(new Date());
+
+        const metalUrl = `https://api.allorigins.win/raw?url=https://www.cbr.ru/scripts/xml_metall.asp?date_req1=${today}&date_req2=${today}`;
+
+        const metalResponse = await fetch(metalUrl);
         const metalText = await metalResponse.text();
+
         const parser = new DOMParser();
         const xml = parser.parseFromString(metalText, "text/xml");
 
@@ -56,11 +66,11 @@ async function loadRates() {
 
         for (let record of records) {
             const code = record.getAttribute("Code");
-            const valueNode = record.getElementsByTagName("Value")[0];
+            const buyNode = record.getElementsByTagName("Buy")[0];
 
-            if (valueNode) {
+            if (buyNode) {
                 const price = parseFloat(
-                    valueNode.textContent.replace(",", ".")
+                    buyNode.textContent.replace(",", ".")
                 ).toFixed(2);
 
                 if (code === "1") gold = price;      // золото
