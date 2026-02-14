@@ -1,3 +1,9 @@
+export const config = {
+  api: {
+    bodyParser: true,
+  },
+};
+
 export default async function handler(req, res) {
   const TOKEN = process.env.TELEGRAM_TOKEN;
 
@@ -5,51 +11,56 @@ export default async function handler(req, res) {
     return res.status(200).send("OK");
   }
 
-  const body = req.body;
-  const chatId = body.message?.chat?.id;
-  const text = body.message?.text;
+  try {
+    const body = req.body;
+    const chatId = body.message?.chat?.id;
+    const text = body.message?.text;
 
-  if (!chatId) {
-    return res.status(200).send("No chat");
-  }
+    if (!chatId) {
+      return res.status(200).send("No chat id");
+    }
 
-  if (text === "/rates") {
-    try {
-      const response = await fetch("https://www.cbr-xml-daily.ru/daily_json.js");
-      const data = await response.json();
+    if (text === "/rates") {
 
-      const usd = data.Valute.USD.Value;
-      const eur = data.Valute.EUR.Value;
-      const cny = data.Valute.CNY.Value;
-      const gold = data.Valute.XAU?.Value || "нет данных";
-      const platinum = data.Valute.XPT?.Value || "нет данных";
+      // Валюты
+      const currencyResponse = await fetch("https://www.cbr-xml-daily.ru/daily_json.js");
+      const currencyData = await currencyResponse.json();
 
-      const message = `
-💱 Курсы ЦБ РФ:
+      // Металлы
+      const metalResponse = await fetch("https://www.cbr-xml-daily.ru/daily_json_metall.json");
+      const metalData = await metalResponse.json();
 
-USD: ${usd} ₽
-EUR: ${eur} ₽
-CNY: ${cny} ₽
+      const usd = currencyData.Valute.USD.Value.toFixed(2);
+      const eur = currencyData.Valute.EUR.Value.toFixed(2);
+      const cny = currencyData.Valute.CNY.Value.toFixed(2);
 
-🥇 Золото: ${gold}
-🥈 Платина: ${platinum}
-      `;
+      const gold = metalData.XAU?.Value?.toFixed(2) || "нет данных";
+      const platinum = metalData.XPT?.Value?.toFixed(2) || "нет данных";
+
+      const message =
+        `💱 Курсы ЦБ РФ:\n\n` +
+        `USD: ${usd} ₽\n` +
+        `EUR: ${eur} ₽\n` +
+        `CNY: ${cny} ₽\n\n` +
+        `🥇 Золото: ${gold} ₽\n` +
+        `⚪ Платина: ${platinum} ₽`;
 
       await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           chat_id: chatId,
-          text: message
-        })
+          text: message,
+        }),
       });
-
-    } catch (err) {
-      console.error(err);
     }
-  }
 
-  res.status(200).send("OK");
+    res.status(200).send("OK");
+
+  } catch (error) {
+    console.error(error);
+    res.status(200).send("Error");
+  }
 }
