@@ -11,7 +11,7 @@ function formatDate(date) {
   return `${day}/${month}/${year}`;
 }
 
-async function getMetals(chatId, TOKEN) {
+async function getMetals() {
   let date = new Date();
 
   for (let i = 0; i < 7; i++) {
@@ -27,17 +27,7 @@ async function getMetals(chatId, TOKEN) {
 
     const xml = await res.text();
 
-    // --- ОТЛАДКА ---
-    if (!xml || !xml.includes("Record")) {
-      await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chat_id: chatId,
-          text: `DEBUG: ${formatted} — данных нет.\nОтвет ЦБ (первые 200 символов):\n${xml.substring(0, 200)}`,
-        }),
-      });
-
+    if (!xml || !xml.includes("BuyCode")) {
       date.setDate(date.getDate() - 1);
       continue;
     }
@@ -113,7 +103,7 @@ export default async function handler(req, res) {
       const cny = extractCurrency("CNY");
 
       // ===== Металлы =====
-      const metals = await getMetals(chatId, TOKEN);
+      const metals = await getMetals();
 
       const metalsText = metals
         ? `📅 Дата металлов: ${metals.date}\n\n` +
@@ -121,10 +111,10 @@ export default async function handler(req, res) {
           `⚪ Серебро: ${metals.silver} ₽/г\n` +
           `🔷 Платина: ${metals.platinum} ₽/г\n` +
           `🟣 Палладий: ${metals.palladium} ₽/г`
-        : `❌ Металлы: Данные не найдены за 7 дней`;
+        : `❌ Металлы: данные не найдены за 7 дней`;
 
       const message =
-        `💱 Курсы ЦБ РФ:\n\n` +
+        `💱 Официальные курсы ЦБ РФ:\n\n` +
         `USD: ${usd} ₽\n` +
         `EUR: ${eur} ₽\n` +
         `CNY: ${cny} ₽\n\n` +
