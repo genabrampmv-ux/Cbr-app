@@ -23,9 +23,10 @@ async function getMetals() {
     const xml = await res.text();
 
     if (xml.includes("<Record")) {
-      const extract = (code) => {
+
+      const extract = (buyCode) => {
         const regex = new RegExp(
-          `<Record Code="${code}"[\\s\\S]*?<Buy>([0-9,]+)<\\/Buy>`
+          `<Record BuyCode="${buyCode}"[\\s\\S]*?<Buy>([0-9,]+)<\\/Buy>`
         );
         const match = xml.match(regex);
         return match ? match[1].replace(",", ".") : "нет данных";
