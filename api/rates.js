@@ -26,10 +26,16 @@ async function getMetals() {
 
       const extract = (buyCode) => {
         const regex = new RegExp(
-          `<Record BuyCode="${buyCode}"[\\s\\S]*?<Buy>([0-9,]+)<\\/Buy>`
+          `<Record[^>]*BuyCode="${buyCode}"[\\s\\S]*?<Buy>([\\s\\S]*?)<\\/Buy>`
         );
+
         const match = xml.match(regex);
-        return match ? match[1].replace(",", ".") : "нет данных";
+
+        if (!match) return "нет данных";
+
+        return match[1]
+          .replace(/\s/g, "")     // удаляем все пробелы (включая неразрывные)
+          .replace(",", ".");     // меняем запятую на точку
       };
 
       return {
@@ -40,7 +46,7 @@ async function getMetals() {
       };
     }
 
-    // если данных нет — минус 1 день
+    // если пусто — пробуем предыдущий день
     date.setDate(date.getDate() - 1);
   }
 
@@ -76,10 +82,15 @@ export default async function handler(req, res) {
 
       const extractCurrency = (code) => {
         const regex = new RegExp(
-          `<CharCode>${code}<\\/CharCode>[\\s\\S]*?<Value>([0-9,]+)<\\/Value>`
+          `<CharCode>${code}<\\/CharCode>[\\s\\S]*?<Value>([\\s\\S]*?)<\\/Value>`
         );
         const match = currencyXml.match(regex);
-        return match ? match[1].replace(",", ".") : "нет данных";
+
+        if (!match) return "нет данных";
+
+        return match[1]
+          .replace(/\s/g, "")
+          .replace(",", ".");
       };
 
       const usd = extractCurrency("USD");
