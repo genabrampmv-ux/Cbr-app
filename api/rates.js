@@ -113,9 +113,9 @@ export default async function handler(req, res) {
 
       const message =
         `💱 Официальные курсы ЦБ РФ:\n\n` +
-        `USD: ${usd} ₽\n` +
-        `EUR: ${eur} ₽\n` +
-        `CNY: ${cny} ₽\n\n` +
+        `💵: ${usd} ₽\n` +
+        `💶: ${eur} ₽\n` +
+        `💴: ${cny} ₽\n\n` +
         metalsText;
 
       await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
