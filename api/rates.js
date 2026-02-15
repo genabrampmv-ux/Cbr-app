@@ -1,14 +1,14 @@
 export const config = {
   api: {
-    bodyParser: false,
+    bodyParser: true,
   },
 };
 
-function extractValueFromXml(xml, name) {
-  const regex = new RegExp(`<Vcode>${name}<\\/Vcode>[\\s\\S]*?<Vcurs>([0-9.]+)<\\/Vcurs>`);
-  const match = xml.match(regex);
+function extractMetal(html, metalName) {
+  const regex = new RegExp(`<td>${metalName}<\\/td>\\s*<td>([0-9,\\.\\s]+)<\\/td>`);
+  const match = html.match(regex);
   if (match && match[1]) {
-    return parseFloat(match[1]);
+    return match[1].replace(/\s/g, "").replace(",", ".");
   }
   return null;
 }
@@ -21,77 +21,68 @@ export default async function handler(req, res) {
   }
 
   try {
-    const body = await new Promise((resolve, reject) => {
-      let data = "";
-      req.on("data", chunk => data += chunk);
-      req.on("end", () => resolve(data));
-      req.on("error", () => reject(data));
-    });
-
-    const payload = JSON.parse(body);
-    const chatId = payload.message?.chat?.id;
-    const text = payload.message?.text;
+    const body = req.body;
+    const chatId = body.message?.chat?.id;
+    const text = body.message?.text;
 
     if (!chatId) {
-      return res.status(200).send("NO CHAT");
+      return res.status(200).send("No chat id");
     }
 
     if (text === "/rates") {
 
-      const today = new Date();
-      const dd = String(today.getDate()).padStart(2, "0");
-      const mm = String(today.getMonth() + 1).padStart(2, "0");
-      const yy = today.getFullYear();
+      // ===== Валюты (официальный XML ЦБ) =====
+      const currencyRes = await fetch("https://www.cbr.ru/scripts/XML_daily.asp");
+      const currencyXml = await currencyRes.text();
 
-      const soapBody = `
-        <soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                         xmlns:xsd="http://www.w3.org/2001/XMLSchema"
-                         xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
-          <soap12:Body>
-            <GetCursOnDateXML xmlns="http://web.cbr.ru/">
-              <On_date>${dd}/${mm}/${yy}</On_date>
-            </GetCursOnDateXML>
-          </soap12:Body>
-        </soap12:Envelope>
-      `;
+      const extractCurrency = (code) => {
+        const regex = new RegExp(
+          `<CharCode>${code}<\\/CharCode>[\\s\\S]*?<Value>([0-9,]+)<\\/Value>`
+        );
+        const match = currencyXml.match(regex);
+        if (match && match[1]) {
+          return match[1].replace(",", ".");
+        }
+        return "нет данных";
+      };
 
-      const response = await fetch("https://www.cbr.ru/DailyInfoWebServ/DailyInfo.asmx", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/soap+xml; charset=utf-8",
-        },
-        body: soapBody,
-      });
+      const usd = extractCurrency("USD");
+      const eur = extractCurrency("EUR");
+      const cny = extractCurrency("CNY");
 
-      const xml = await response.text();
+      // ===== Металлы (официальная страница ЦБ) =====
+      const metalRes = await fetch("https://www.cbr.ru/hd_base/metall/");
+      const metalHtml = await metalRes.text();
 
-      const usd = extractValueFromXml(xml, "USD");
-      const eur = extractValueFromXml(xml, "EUR");
-      const cny = extractValueFromXml(xml, "CNY");
-
-      const gold = extractValueFromXml(xml, "XAU"); // золото
-      const platinum = extractValueFromXml(xml, "XPT"); // платина
+      const gold = extractMetal(metalHtml, "Золото") || "нет данных";
+      const silver = extractMetal(metalHtml, "Серебро") || "нет данных";
+      const platinum = extractMetal(metalHtml, "Платина") || "нет данных";
+      const palladium = extractMetal(metalHtml, "Палладий") || "нет данных";
 
       const message =
-        `💱 Курсы ЦБ РФ на ${dd}.${mm}.${yy}:\n\n` +
-        `USD: ${usd !== null ? usd.toFixed(2) + " ₽" : "нет данных"}\n` +
-        `EUR: ${eur !== null ? eur.toFixed(2) + " ₽" : "нет данных"}\n` +
-        `CNY: ${cny !== null ? cny.toFixed(2) + " ₽" : "нет данных"}\n\n` +
-        `🥇 Золото (XAU): ${gold !== null ? gold.toFixed(2) + " ₽" : "нет данных"}\n` +
-        `⚪ Платина (XPT): ${platinum !== null ? platinum.toFixed(2) + " ₽" : "нет данных"}`;
+        `💱 Официальные курсы ЦБ РФ:\n\n` +
+        `USD: ${usd} ₽\n` +
+        `EUR: ${eur} ₽\n` +
+        `CNY: ${cny} ₽\n\n` +
+        `🥇 Золото: ${gold} ₽/г\n` +
+        `⚪ Серебро: ${silver} ₽/г\n` +
+        `🔷 Платина: ${platinum} ₽/г\n` +
+        `🟣 Палладий: ${palladium} ₽/г`;
 
       await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ chat_id: chatId, text: message }),
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: message,
+        }),
       });
-
     }
 
-    return res.status(200).send("OK");
+    res.status(200).send("OK");
 
   } catch (error) {
     console.error(error);
-    return res.status(500).send("Error");
+    res.status(200).send("Error");
   }
 }
