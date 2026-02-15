@@ -16,7 +16,6 @@ async function getMetals() {
 
   for (let i = 0; i < 7; i++) {
     const formatted = formatDate(date);
-
     const url = `https://www.cbr.ru/scripts/xml_metall.asp?date_req1=${formatted}&date_req2=${formatted}`;
 
     const res = await fetch(url, {
@@ -27,33 +26,35 @@ async function getMetals() {
 
     const xml = await res.text();
 
-    if (!xml || !xml.includes("BuyCode")) {
-      date.setDate(date.getDate() - 1);
-      continue;
+    // Проверяем наличие тега Record (регистронезависимо)
+    if (/<Record/i.test(xml)) {
+
+      const extract = (buyCode) => {
+        const regex = new RegExp(
+          `BuyCode\\s*=\\s*["']${buyCode}["'][^>]*>[\\s\\S]*?<Buy>([^<]+)<\\/Buy>`,
+          "i"
+        );
+
+        const match = xml.match(regex);
+
+        if (!match) return "нет данных";
+
+        return match[1]
+          .replace(/[\s\u00A0]/g, "")
+          .replace(",", ".");
+      };
+
+      return {
+        date: formatted,
+        gold: extract("1"),
+        silver: extract("2"),
+        platinum: extract("3"),
+        palladium: extract("4"),
+      };
     }
 
-    const extract = (buyCode) => {
-      const regex = new RegExp(
-        `BuyCode="${buyCode}"[^>]*>[\\s\\S]*?<Buy>([^<]+)<\\/Buy>`,
-        "i"
-      );
-
-      const match = xml.match(regex);
-
-      if (!match) return "нет данных";
-
-      return match[1]
-        .replace(/[\s\u00A0]/g, "")
-        .replace(",", ".");
-    };
-
-    return {
-      date: formatted,
-      gold: extract("1"),
-      silver: extract("2"),
-      platinum: extract("3"),
-      palladium: extract("4"),
-    };
+    // Если нет данных — откатываемся на предыдущий день
+    date.setDate(date.getDate() - 1);
   }
 
   return null;
@@ -78,15 +79,19 @@ export default async function handler(req, res) {
     if (text === "/rates") {
 
       // ===== Валюты =====
-      const currencyRes = await fetch("https://www.cbr.ru/scripts/XML_daily.asp", {
-        headers: { "User-Agent": "Mozilla/5.0" },
-      });
+      const currencyRes = await fetch(
+        "https://www.cbr.ru/scripts/XML_daily.asp",
+        {
+          headers: { "User-Agent": "Mozilla/5.0" },
+        }
+      );
 
       const currencyXml = await currencyRes.text();
 
       const extractCurrency = (code) => {
         const regex = new RegExp(
-          `<CharCode>${code}<\\/CharCode>[\\s\\S]*?<Value>([^<]+)<\\/Value>`
+          `<CharCode>${code}<\\/CharCode>[\\s\\S]*?<Value>([^<]+)<\\/Value>`,
+          "i"
         );
 
         const match = currencyXml.match(regex);
