@@ -26,34 +26,27 @@ async function getMetals() {
 
     const xml = await res.text();
 
-    // Проверяем наличие тега Record (регистронезависимо)
-    if (/<Record/i.test(xml)) {
+    // Ищем все значения внутри <Buy>...</Buy>
+    const allPrices = xml.match(/<Buy>([^<]+)<\/Buy>/gi);
 
-      const extract = (buyCode) => {
-        const regex = new RegExp(
-          `BuyCode\\s*=\\s*["']${buyCode}["'][^>]*>[\\s\\S]*?<Buy>([^<]+)<\\/Buy>`,
-          "i"
-        );
+    if (allPrices && allPrices.length >= 4) {
 
-        const match = xml.match(regex);
-
-        if (!match) return "нет данных";
-
-        return match[1]
+      const clean = (str) =>
+        str
+          .replace(/<[^>]+>/g, "")
           .replace(/[\s\u00A0]/g, "")
           .replace(",", ".");
-      };
 
       return {
         date: formatted,
-        gold: extract("1"),
-        silver: extract("2"),
-        platinum: extract("3"),
-        palladium: extract("4"),
+        gold: clean(allPrices[0]),
+        silver: clean(allPrices[1]),
+        platinum: clean(allPrices[2]),
+        palladium: clean(allPrices[3]),
       };
     }
 
-    // Если нет данных — откатываемся на предыдущий день
+    // Если цен нет — откат на предыдущий день
     date.setDate(date.getDate() - 1);
   }
 
