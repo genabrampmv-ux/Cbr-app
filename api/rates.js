@@ -11,7 +11,7 @@ function formatDate(date) {
   return `${day}/${month}/${year}`;
 }
 
-async function getMetals() {
+async function getMetals(chatId, TOKEN) {
   let date = new Date();
 
   for (let i = 0; i < 7; i++) {
@@ -27,15 +27,24 @@ async function getMetals() {
 
     const xml = await res.text();
 
-    // если ответ слишком короткий — пробуем предыдущий день
-    if (!xml || xml.length < 200) {
+    // --- ОТЛАДКА ---
+    if (!xml || !xml.includes("Record")) {
+      await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: `DEBUG: ${formatted} — данных нет.\nОтвет ЦБ (первые 200 символов):\n${xml.substring(0, 200)}`,
+        }),
+      });
+
       date.setDate(date.getDate() - 1);
       continue;
     }
 
     const extract = (buyCode) => {
       const regex = new RegExp(
-        `BuyCode="${buyCode}"[\\s\\S]*?<Buy>([\\s\\S]*?)<\\/Buy>`,
+        `BuyCode="${buyCode}"[^>]*>[\\s\\S]*?<Buy>([^<]+)<\\/Buy>`,
         "i"
       );
 
@@ -44,11 +53,12 @@ async function getMetals() {
       if (!match) return "нет данных";
 
       return match[1]
-        .replace(/\s/g, "")  // удаляем пробелы и неразрывные пробелы
+        .replace(/[\s\u00A0]/g, "")
         .replace(",", ".");
     };
 
     return {
+      date: formatted,
       gold: extract("1"),
       silver: extract("2"),
       platinum: extract("3"),
@@ -56,12 +66,7 @@ async function getMetals() {
     };
   }
 
-  return {
-    gold: "нет данных",
-    silver: "нет данных",
-    platinum: "нет данных",
-    palladium: "нет данных",
-  };
+  return null;
 }
 
 export default async function handler(req, res) {
@@ -84,16 +89,14 @@ export default async function handler(req, res) {
 
       // ===== Валюты =====
       const currencyRes = await fetch("https://www.cbr.ru/scripts/XML_daily.asp", {
-        headers: {
-          "User-Agent": "Mozilla/5.0",
-        },
+        headers: { "User-Agent": "Mozilla/5.0" },
       });
 
       const currencyXml = await currencyRes.text();
 
       const extractCurrency = (code) => {
         const regex = new RegExp(
-          `<CharCode>${code}<\\/CharCode>[\\s\\S]*?<Value>([\\s\\S]*?)<\\/Value>`
+          `<CharCode>${code}<\\/CharCode>[\\s\\S]*?<Value>([^<]+)<\\/Value>`
         );
 
         const match = currencyXml.match(regex);
@@ -101,7 +104,7 @@ export default async function handler(req, res) {
         if (!match) return "нет данных";
 
         return match[1]
-          .replace(/\s/g, "")
+          .replace(/[\s\u00A0]/g, "")
           .replace(",", ".");
       };
 
@@ -110,17 +113,22 @@ export default async function handler(req, res) {
       const cny = extractCurrency("CNY");
 
       // ===== Металлы =====
-      const metals = await getMetals();
+      const metals = await getMetals(chatId, TOKEN);
+
+      const metalsText = metals
+        ? `📅 Дата металлов: ${metals.date}\n\n` +
+          `🥇 Золото: ${metals.gold} ₽/г\n` +
+          `⚪ Серебро: ${metals.silver} ₽/г\n` +
+          `🔷 Платина: ${metals.platinum} ₽/г\n` +
+          `🟣 Палладий: ${metals.palladium} ₽/г`
+        : `❌ Металлы: Данные не найдены за 7 дней`;
 
       const message =
-        `💱 Официальные курсы ЦБ РФ:\n\n` +
+        `💱 Курсы ЦБ РФ:\n\n` +
         `USD: ${usd} ₽\n` +
         `EUR: ${eur} ₽\n` +
         `CNY: ${cny} ₽\n\n` +
-        `🥇 Золото: ${metals.gold} ₽/г\n` +
-        `⚪ Серебро: ${metals.silver} ₽/г\n` +
-        `🔷 Платина: ${metals.platinum} ₽/г\n` +
-        `🟣 Палладий: ${metals.palladium} ₽/г`;
+        metalsText;
 
       await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
         method: "POST",
